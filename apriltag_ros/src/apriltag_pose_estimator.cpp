@@ -3,6 +3,7 @@
 #include <opencv2/calib3d/calib3d.hpp>
 #include <boost/thread/lock_guard.hpp>
 #include <geometry_msgs/TransformStamped.h>
+#include <tf/tfMessage.h>
 
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Matrix3x3.h>
@@ -49,6 +50,7 @@ ApriltagPoseEstimator::ApriltagPoseEstimator(const ros::NodeHandle &pnh)
 
   sub_cinfo_ = pnh_.subscribe("camera_info", 1, &ApriltagPoseEstimator::CinfoCb, this);
 
+  tf_pub_ = pnh_.advertise<tf::tfMessage>("/tf", 1);
   if(auto_disconnect){
     auto connect_cb = boost::bind(&ApriltagPoseEstimator::ConnectCb, this);
     boost::lock_guard<boost::mutex> lock(connect_mutex_);
@@ -80,6 +82,7 @@ void ApriltagPoseEstimator::ApriltagsCb(const am::ApriltagArrayStampedConstPtr &
   if (!cam_model_.initialized() || map_.empty()) return;
 
   am::ApriltagPoseStamped apriltag_poses;
+  tf::tfMessage tf_msg;
 
   for (const am::Apriltag &apriltag : apriltags_msg->apriltags) {
     auto search = map_.find(apriltag.id);
@@ -166,7 +169,8 @@ void ApriltagPoseEstimator::ApriltagsCb(const am::ApriltagArrayStampedConstPtr &
         transformStamped.transform.rotation.z = tf_quat.z();
         transformStamped.transform.rotation.w = tf_quat.w();
 
-        tf2_br_.sendTransform(transformStamped);
+        tf_msg.transforms.push_back(transformStamped);
+        //tf2_br_.sendTransform(transformStamped);
       }
 
       apriltag_poses.apriltags.push_back(apriltag);
@@ -178,7 +182,14 @@ void ApriltagPoseEstimator::ApriltagsCb(const am::ApriltagArrayStampedConstPtr &
   apriltag_poses.header = apriltags_msg->header;
   apriltag_poses.posearray.header = apriltag_poses.header;
   if(apriltag_poses.apriltags.size()>0)
+  {
     pub_poses_.publish(apriltag_poses);
+    if(broadcast_tf_)
+    {
+      tf_pub_.publish(tf_msg);
+    }
+  }
+
 }
 
 void ApriltagPoseEstimator::InitApriltagMap() {

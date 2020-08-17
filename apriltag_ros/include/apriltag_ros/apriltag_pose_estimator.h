@@ -36,6 +36,7 @@ class ApriltagPoseEstimator {
 
   ros::NodeHandle pnh_;
   ros::Publisher pub_poses_;
+  ros::Publisher tf_pub_;
   ros::Subscriber sub_apriltags_, sub_cinfo_;
   tf2_ros::TransformBroadcaster tf2_br_;
   image_geometry::PinholeCameraModel cam_model_;
